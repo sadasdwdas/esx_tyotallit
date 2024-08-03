@@ -2,49 +2,21 @@ Config = {}
 
 Config.Jobs = {
     ['police'] = {
-        {
             Label = "Poliisi talli",
             Positions = {
                 vector4(1867.3602, 3687.9919, 34.2675, 87.6925),
-            }, 
-            SpawnPosition = vector4(1870.1655, 3683.2578, 33.6978, 209.5867), 
-            DeleteVehiclePosition = vector4(1875.0, 3680.0, 33.7, 209.0), 
-            Ped = `s_m_y_airworker`, 
-            Scenario = "WORLD_HUMAN_CLIPBOARD", 
-            Vehicles = {
-                ['Skoda242'] = { model = 'poliisi242', livery = 0},
-                ['Volkswagen440'] = { model = 'poliisi440', livery = 0},
-                ['Maija024'] = { model = 'poliisi024', livery = 0},
-                ['Maija100'] = { model = 'poliisi100', livery = 0},
-                ['Maija108'] = { model = 'poliisi108', livery = 0},
-                ['Karhu'] = { model = 'karhu2', livery = 0},
-            }
-        },
-        {
-            Label = "Avaa helikopteri talli",
-            Positions = {
-                vector4(463.5470, -987.4406, 42.6923, 89.9438),
             },
-            SpawnPosition = vector4(441.8160, -986.7783, 43.6923, 90.0514),
-            DeleteVehiclePosition = vector4(447.0, -980.0, 43.7, 90.0),
+            SpawnPosition = vector4(1870.1655, 3683.2578, 33.6978, 209.5867),
+            DeleteVehiclePosition = vector4(1875.0, 3680.0, 33.7, 209.0),
             Ped = `s_m_y_airworker`,
             Scenario = "WORLD_HUMAN_CLIPBOARD",
             Vehicles = {
-                ['Helikopteri'] = { model = 'kh1', livery = 0},
-            }
-        },
-        {
-            Label = "Avaa vene talli",
-            Positions = {
-                vector4(-783.7814, -1506.9399, 1.5952, 292.1099),
-            },
-            SpawnPosition = vector4(-789.2935, -1505.5763, 2.2589, 109.3811),
-            DeleteVehiclePosition = vector4(-795.0, -1503.0, 2.2, 109.0),
-            Ped = `s_m_y_airworker`,
-            Scenario = "WORLD_HUMAN_CLIPBOARD",
-            Vehicles = {
-                ['Vene'] = { model = 'pvene', livery = 0},
-            }
+                ['Skoda242'] = { model = 'poliisi242'},
+                ['Volkswagen440'] = { model = 'poliisi440'},
+                ['Maija024'] = { model = 'poliisi024'},
+                ['Maija100'] = { model = 'poliisi100'},
+                ['Maija108'] = { model = 'poliisi108'},
+                ['Karhu'] = { model = 'karhu2'},
         }
     },
     ['mechanic'] = {

@@ -1,119 +1,128 @@
 ESX = exports['es_extended']:getSharedObject()
 
+local playerJob = nil
+
 Citizen.CreateThread(function()
-    for jobName, garages in pairs(Config.Jobs) do
-        for _, data in ipairs(garages) do
-            for _, pos in ipairs(data.Positions) do
-                -- Luo NPC ja aseta skenaario
-                local npcPed = CreatePed(4, data.Ped, pos.x, pos.y, pos.z, pos.w, false, true)
-                SetEntityAsMissionEntity(npcPed, true, true)
-                SetBlockingOfNonTemporaryEvents(npcPed, true)
-                TaskStartScenarioInPlace(npcPed, data.Scenario, 0, true)
-
-                SetPedCanRagdoll(npcPed, false)
-                SetPedCanRagdollFromPlayerImpact(npcPed, false)
-                SetPedCanBeKnockedOffVehicle(npcPed, false)
-                SetPedConfigFlag(npcPed, 185, true)
-                SetPedConfigFlag(npcPed, 108, true)
-
-                exports.ox_target:addLocalEntity(npcPed, {
-                    {
-                        name = 'vehicle:take',
-                        icon = 'fas fa-car',
-                        label = data.Label,
-                        onSelect = function()
-                            ESX.TriggerServerCallback('checkJobPermission', function(hasPermission)
-                                if hasPermission then
-                                    local vehicles = data.Vehicles
-                                    local elements = {}
-                                    for label, vehicle in pairs(vehicles) do
-                                        table.insert(elements, {
-                                            title = label,
-                                            description = 'Ota ajoneuvo: ' .. label,
-                                            event = 'vehicle:spawn',
-                                            args = {
-                                                model = vehicle.model,
-                                                spawnPos = data.SpawnPosition,
-                                                plate = Config.Jobs[jobName].CustomPlate,
-                                                livery = vehicle.livery
-                                            }
-                                        })
-                                    end
-
-                                    lib.registerContext({
-                                        id = 'vehicle_menu',
-                                        title = 'Valitse ajoneuvo',
-                                        options = elements
-                                    })
-
-                                    lib.showContext('vehicle_menu')
-                                else
-                                    ESX.ShowNotification('Sinulla ei ole oikeutta tehdä tätä')
-                                end
-                            end, jobName)
-                        end,
-                        canInteract = function(entity)
-                            return entity == npcPed and ESX.PlayerData.job.name == jobName
-                        end
-                    }
-                })
-
-                Citizen.CreateThread(function()
-                    local showing = false
-                    while true do
-                        Citizen.Wait(0)
-                        local ped = PlayerPedId()
-                        local pos = GetEntityCoords(ped)
-                        local inVehicle = IsPedInAnyVehicle(ped, false)
-                        local dist = #(pos - vector3(data.DeleteVehiclePosition.x, data.DeleteVehiclePosition.y, data.DeleteVehiclePosition.z))
-
-                        if dist < 10.0 and inVehicle then
-                            ESX.TriggerServerCallback('checkJobPermission', function(hasPermission)
-                                if hasPermission then
-                                    if not showing then
-                                        lib.showTextUI('[E] - talleta ajoneuvo')
-                                        showing = true
-                                    end
-
-                                    if IsControlJustReleased(0, 38) then -- E-näppäin
-                                        local vehicle = GetVehiclePedIsIn(ped, false)
-                                        if vehicle then
-                                            DeleteVehicle(vehicle)
-                                            ESX.UI.Menu.CloseAll()
-                                            lib.hideTextUI()
-                                            showing = false
-                                        end
-                                    end
-                                else
-                                    if showing then
-                                        lib.hideTextUI()
-                                        showing = false
-                                    end
-                                end
-                            end, jobName)
-                        else
-                            if showing then
-                                lib.hideTextUI()
-                                showing = false
-                            end
-                        end
-                    end
-                end)
-            end
-        end
+    while ESX == nil do
+        Citizen.Wait(100)
     end
+
+    updatePlayerJob()
+    createNPCs()
+    
+    Citizen.CreateThread(function()
+        while true do
+            updatePlayerJob()
+            Citizen.Wait(30000)
+        end
+    end)
 end)
 
-RegisterNetEvent('vehicle:spawn')
-AddEventHandler('vehicle:spawn', function(data)
-    local model = data.model
-    local coords = data.spawnPos
-    local plate = data.plate
-    local livery = data.livery
+function updatePlayerJob()
+    ESX.PlayerData = ESX.GetPlayerData()
+    playerJob = ESX.PlayerData.job and ESX.PlayerData.job.name or nil
+end
 
-    ESX.Game.SpawnVehicle(model, vector3(coords.x, coords.y, coords.z), coords.w, function(vehicle)
-        SetVehicleNumberPlateText(vehicle, plate)
-        SetVehicleLivery(vehicle, livery)
-        exports.ox_fuel:SetFuel(vehicle, 100.0)
-    end)
+function createNPCs()
+    for jobName, jobData in pairs(Config.Jobs) do
+        for _, pos in ipairs(jobData.Positions) do
+            local pedModel = jobData.Ped
+
+            RequestModel(pedModel)
+            while not HasModelLoaded(pedModel) do
+                Wait(1)
+            end
+
+            local npc = CreatePed(4, pedModel, pos.x, pos.y, pos.z - 1.0, pos.w, false, true)
+            SetEntityAsMissionEntity(npc, true, true)
+            SetBlockingOfNonTemporaryEvents(npc, true)
+            TaskStartScenarioInPlace(npc, jobData.Scenario, 0, true)
+            
+            SetPedCanRagdoll(npc, false)
+            SetPedCanRagdollFromPlayerImpact(npc, false)
+            SetPedDiesWhenInjured(npc, false)
+            SetPedCanBeTargetted(npc, false)
+            SetPedCanBeTargettedByPlayer(npc, PlayerId(), false)
+            ClearPedTasks(npc)
+            FreezeEntityPosition(npc, true)
+
+            exports.ox_target:addLocalEntity(npc, {
+                {
+                    name = 'vehicle_menu_' .. jobName,
+                    label = jobData.Label,
+                    icon = 'fa-solid fa-car',
+                    onSelect = function()
+                        openVehicleMenu(jobName, jobData)
+                    end,
+                    canInteract = function(entity, distance, coords, name)
+                        return playerJob == jobName
+                    end
+                }
+            })
+        end
+    end
+end
+
+function openVehicleMenu(jobName, jobData)
+    local options = {}
+
+    for vehicleLabel, vehicleData in pairs(jobData.Vehicles) do
+        table.insert(options, {
+            title = vehicleLabel,
+            onSelect = function()
+                spawnVehicle(jobData.SpawnPosition, vehicleData.model)
+            end
+        })
+    end
+
+    lib.registerContext({
+        id = jobName .. '_vehicle_menu',
+        title = jobData.Label,
+        options = options
+    })
+
+    lib.showContext(jobName .. '_vehicle_menu')
+end
+
+function spawnVehicle(spawnPos, model)
+    RequestModel(model)
+    while not HasModelLoaded(model) do
+        Wait(1)
+    end
+
+    local vehicle = CreateVehicle(model, spawnPos.x, spawnPos.y, spawnPos.z, spawnPos.w, true, false)
+    SetEntityAsMissionEntity(vehicle, true, true)
+end
+
+Citizen.CreateThread(function()
+    while true do
+        local playerPed = PlayerPedId()
+        local playerVeh = GetVehiclePedIsIn(playerPed, false)
+        local playerCoords = GetEntityCoords(playerPed)
+        local sleep = true
+
+        for jobName, jobData in pairs(Config.Jobs) do
+            local delPos = jobData.DeleteVehiclePosition
+
+            if playerJob == jobName then
+                if DoesEntityExist(playerVeh) and #(playerCoords - vector3(delPos.x, delPos.y, delPos.z)) < 5.0 then
+                    sleep = false
+                    lib.showTextUI('[E] - talleta ajoneuvo')
+                    if IsControlJustReleased(0, 38) then -- E key
+                        ESX.Game.DeleteVehicle(playerVeh)
+                    end
+                elseif not DoesEntityExist(playerVeh) and #(playerCoords - vector3(delPos.x, delPos.y, delPos.z)) < 5.0 then
+                    lib.showTextUI('[E] - talleta ajoneuvo')
+                else
+                    lib.hideTextUI()
+                end
+            end
+        end
+
+        if sleep then
+            Wait(500)
+        else
+            Wait(0)
+        end
+    end
 end)
